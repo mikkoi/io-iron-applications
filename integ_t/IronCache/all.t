@@ -31,14 +31,18 @@ my $policies_file_content = <<END_OF_CONTENT;
     "__comment1":"Use normal regexp. [[:digit:]] = number:0-9, [[:alpha:]] = alphabetic character, [[:alnum:]] = character or number.",
     "__comment2":"Do not use end/begin limitators '^' and '\$'. They are added automatically.",
     "character_set":"ascii",
+    "character_group":{
+        "[:lim_uchar:]":"ABC",
+        "[:low_digit:]":"0123"
+    }
     "cache":{
         "name":[
             "cache_01_main",
             "cache_[[:alpha:]]{1}[[:digit:]]{2}"
         ],
         "item_key":[
-            "item_01_[[:digit:]]{2,3}",
-            "item_01_[[:alpha:]]{1,4}"
+            "item.01_[[:digit:]]{2}",
+            "item.02_[[:lim_uchar:]]{1,2}"
         ]
     }
 }
@@ -51,10 +55,10 @@ my $cache_name_01 = 'cache_A01';
 my $cache_name_02 = 'cache_A02';
 my $cache_name_03 = 'cache_A03';
 # Item keys
-my $item_key_01 = 'item_01_01';
-my $item_key_02 = 'item_01_02';
-my $item_key_03 = 'item_01_03';
-my $item_key_04 = 'item_01_04';
+my $item_key_01 = 'item.01_01';
+my $item_key_02 = 'item.01_02';
+my $item_key_03 = 'item.02_A';
+my $item_key_04 = 'item.02_BB';
 # Item integer values
 my $item_value_01 = '15';
 my $item_value_02 = '-95';
@@ -70,29 +74,39 @@ subtest 'Testing' => sub {
 
     my @cmd_line_array;
     my $result;
-    @cmd_line_array = ('put', 'item', $item_key_01, '--cache', $cache_name_01, '--value', '15', '--create-cache', '--config', $config_file_name, '--policies', $policies_file_name );
+    @cmd_line_array = ('put', 'item', "$item_key_01,$item_key_02",
+            '--cache', $cache_name_01,
+            '--value', '15', '--create-cache',
+            '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
     is($result->stdout(), '', 'Print nothing to stdout.');
     is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
-    @cmd_line_array = ('increment', 'item', $item_key_01, '--cache', $cache_name_01, '--value', '10', '--config', $config_file_name, '--policies', $policies_file_name );
+    @cmd_line_array = ('increment', 'item', "$item_key_01",
+            '--cache', "$cache_name_01,$cache_name_02",
+            '--value', '10',
+            '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
     is($result->stdout(), '', 'Print nothing to stdout.');
     is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
-    @cmd_line_array = ('get', 'item', $item_key_01, '--cache', $cache_name_01, '--config', $config_file_name, '--policies', $policies_file_name );
+    @cmd_line_array = ('get', 'item', "$item_key_01,$item_key_02",
+            '--cache', "$cache_name_01,$cache_name_02",
+            '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
     #diag(Dumper($result));
-    is($result->stdout(), "25\n", 'Stdout has the value.');
-    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->stdout(), "25\n15\n10\nKey not exists.\n", 'Stdout has the value.');
+    is($result->stderr(), "Item '$item_key_02' does not exist in cache '$cache_name_02'.", 'Print warning to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
-    @cmd_line_array = ('delete', 'item', $item_key_01, '--cache', $cache_name_01, '--config', $config_file_name, '--policies', $policies_file_name );
+    @cmd_line_array = ('delete', 'item', "$item_key_01,$item_key_02",
+            '--cache', "$cache_name_01,$cache_name_02",
+            '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
     #diag(Dumper($result));

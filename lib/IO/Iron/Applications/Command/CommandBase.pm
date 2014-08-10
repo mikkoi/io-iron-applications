@@ -30,8 +30,6 @@ This package is for internal use of IO::Iron packages.
 
 =cut
 
-use Data::Dumper;
-
 use Log::Any  qw{$log};
 require JSON::MaybeXS;
 use Data::UUID ();
@@ -48,6 +46,8 @@ use Exception::Class (
         fields => ['status_code', 'response_message'],
       }
   );
+
+require IO::Iron::Common;
 
 # CONSTANTS
 
@@ -91,11 +91,22 @@ the ones used by Pod::Weaver::Section::Name.
 #    return "Show an IronCache";
 #}
 
+=head2 usage_desc
+
+Describe usage of the command.
+
+=cut
+
 sub usage_desc { 
     my ($self, $opt, $args) = @_;
-    print Dumper(@_);
     return $opt->arg0() . " %o show cache [cache name]" ;
 }
+
+=head2 opt_spec_base
+
+The options shared by all subcommands.
+
+=cut
 
 sub opt_spec_base {
     return (
@@ -128,6 +139,13 @@ Log::Log4perl::init( \$conf );
 use Log::Any::Adapter;
 Log::Any::Adapter->set('Log::Log4perl');
 
+=head2 raise_logging_levels_from_options
+
+Raise logging level according to specified options.
+Available options: info, debug, trace.
+
+=cut
+
 sub raise_logging_levels_from_options {
     my ($self, $opts) = @_;
     if($opts->{'verbose'} > 0) {
@@ -145,7 +163,12 @@ sub raise_logging_levels_from_options {
     return;
 }
 
-require IO::Iron::Common;
+=head2 check_for_iron_io_config
+
+Check that config can be accessed.
+
+=cut
+
 sub check_for_iron_io_config {
     my ($self, $opts) = @_;
     $log->tracef('Entering check_for_iron_io_config(%s)', $opts);
@@ -174,6 +197,12 @@ my %tt_config = (
     dummy_use_for_config_stash => $Template::Config::STASH,
 );
 
+=head2 combine_template
+
+Find template of args[1] and combine it with data in the referenced structure of args[2].
+
+=cut
+
 sub combine_template {
     my ($self, $template_name, $data) = @_;
     $log->tracef('Entering combine_template(%s,%s)', $template_name, $data);
@@ -186,7 +215,7 @@ sub combine_template {
     my $tt_output;
     my $template_routine_name = 
             'IO::Iron::Applications::IronCache::Templates::' 
-            . $template_name 
+            . '_' . $template_name 
             . '_template';
     $log->debugf('combine_template(): Fetching template from \'%s\'', $template_routine_name);
     #my $tt_template = eval { $template_routine_name };

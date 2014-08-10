@@ -19,6 +19,12 @@ END {
 
 use App::Cmd::Setup -app;
 
+=head2 description
+
+Description of command.
+
+=cut
+
 sub description {
 	return "IronCache functions";
 }

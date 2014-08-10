@@ -44,6 +44,12 @@ use constant {
     OPERATION_DELETE => q{delete},
 };
 
+=head2 list_caches
+
+list caches function.
+
+=cut
+
 sub list_caches {
     my %params = validate(
         @_, {
@@ -70,6 +76,12 @@ sub list_caches {
     $log->tracef('Exiting list_caches()');
     return %output;
 }
+
+=head2 list_items
+
+list items function.
+
+=cut
 
 sub list_items {
     my %params = validate(
@@ -157,6 +169,12 @@ sub list_items {
     return %output;
 }
 
+=head2 show_cache
+
+show cache function.
+
+=cut
+
 sub show_cache {
     my %params = validate(
         @_, {
@@ -198,6 +216,12 @@ sub show_cache {
     return %output;
 }
 
+=head2 delete_cache
+
+delete cache function.
+
+=cut
+
 sub delete_cache {
     my %params = validate(
         @_, {
@@ -207,7 +231,7 @@ sub delete_cache {
             'cache_names' => { type => ARRAYREF, optional => 0, }, # cache name or names separated with ',', no wildcards.
         }
     );
-    $log->tracef('Entering delete_cache(%s)', \%params);
+    $log->tracef('Entering _delete_cache(%s)', \%params);
 
     my %cache_params;
     $cache_params{'config'} = $params{'config'} if defined $params{'config'};
@@ -234,25 +258,25 @@ sub delete_cache {
         $infos{$info->{'name'}} = \%info;
     }
     $output{'caches'} = \%infos;
-    $log->tracef('Exiting delete_cache()');
+    $log->tracef('Exiting _delete_cache()');
     return %output;
 }
 
-sub put_item_thread {
+sub _put_item_thread {
     my %params = validate(
         @_, {
             'item_info' => { type => HASHREF, optional => 0, },
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
         }
     );
-    $log->tracef('Entering put_item_thread(%s)', \%params);
+    $log->tracef('Entering _put_item_thread(%s)', \%params);
 
     my %result;
     my $cache_name = $params{'item_info'}->{'cache_name'};
     my $item_key = $params{'item_info'}->{'item_key'};
-    $log->debugf('put_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
-    my $client = prepare_client(%{$params{'pointer_to_params'}});
-    my $cache = get_cache_safely('client' => $client, 'cache_name' => $cache_name);
+    $log->debugf('_put_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
+    my $client = _prepare_client(%{$params{'pointer_to_params'}});
+    my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
     if (!$cache && $params{'item_info'}->{'create_cache'}) {
         $log->infof('Cache \'%s\' does not exist. Creating new cache.', $cache_name);
         $cache = $client->create_cache('name' => $cache_name);
@@ -264,11 +288,11 @@ sub put_item_thread {
         $item_parameters{'expires_in'} = $params{'item_info'}->{'expires_in'}
             if $params{'item_info'}->{'expires_in'};
         my $item = IO::Iron::IronCache::Item->new(%item_parameters);
-        my $rval = operate_item_safely('cache' => $cache,
+        my $rval = _operate_item_safely('cache' => $cache,
             'item_key' => $item_key, 'operation' => OPERATION_PUT,
             'item' => $item);
         if($rval) {
-            # Attn. operate_item_safely returns undef if alright, otherwise error message.
+            # Attn. _operate_item_safely returns undef if alright, otherwise error message.
             $result{'error'} = $rval;
         }
     }
@@ -278,6 +302,12 @@ sub put_item_thread {
     } # if cache else
     return %result;
 }
+
+=head2 put_item
+
+put item function.
+
+=cut
 
 sub put_item {
     my %params = validate(
@@ -297,7 +327,7 @@ sub put_item {
     # FIXME %output
     my %output;
     my %results;
-    my %items_and_caches = prepare_items_and_caches(%params);
+    my %items_and_caches = _prepare_items_and_caches(%params);
     $log->debugf('put_item(): items_and_caches=%s', \%items_and_caches);
     my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
     $parallel_exe->share(\%items_and_caches);
@@ -309,7 +339,7 @@ sub put_item {
         my $value = $items_and_caches{$key};
         my %result;
         eval {
-            %result = put_item_thread('item_info' => $value, 'pointer_to_params' => \%params);
+            %result = _put_item_thread('item_info' => $value, 'pointer_to_params' => \%params);
         };
         if($EVAL_ERROR) {
             print $EVAL_ERROR;
@@ -333,32 +363,32 @@ sub put_item {
     return %output;
 }
 
-sub increment_item_thread {
+sub _increment_item_thread {
     my %params = validate(
         @_, {
             'item_info' => { type => HASHREF, optional => 0, },
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
         }
     );
-    $log->tracef('Entering increment_item_thread(%s)', \%params);
+    $log->tracef('Entering _increment_item_thread(%s)', \%params);
 
     my %result;
     my $cache_name = $params{'item_info'}->{'cache_name'};
     my $item_key = $params{'item_info'}->{'item_key'};
-    $log->debugf('increment_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
-    my $client = prepare_client(%{$params{'pointer_to_params'}});
-    my $cache = get_cache_safely('client' => $client, 'cache_name' => $cache_name);
+    $log->debugf('_increment_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
+    my $client = _prepare_client(%{$params{'pointer_to_params'}});
+    my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
     if (!$cache && $params{'item_info'}->{'create_cache'}) {
         $log->infof('Cache \'%s\' does not exist. Creating new cache.', $cache_name);
         $cache = $client->create_cache('name' => $cache_name);
     }
     if($cache) {
-        $log->debugf("increment_item_thread(): To item: \'%s\'.'.", $item_key);
-        my $rval = operate_item_safely('cache' => $cache,
+        $log->debugf("_increment_item_thread(): To item: \'%s\'.'.", $item_key);
+        my $rval = _operate_item_safely('cache' => $cache,
             'item_key' => $item_key, 'operation' => OPERATION_INCREMENT,
             'increment' =>$params{'item_info'}->{'item_increment'});
         if($rval) {
-            # Attn. operate_item_safely returns undef if alright, otherwise error message.
+            # Attn. _operate_item_safely returns undef if alright, otherwise error message.
             $result{'error'} = $rval;
         }
     }
@@ -369,10 +399,16 @@ sub increment_item_thread {
     return %result;
 }
 
+=head2 increment_item
+
+increment item function.
+
+=cut
+
 sub increment_item {
     my %params = validate(
         @_, {
-            common_arguments(),
+            _common_arguments(),
             'cache_name' => { type => ARRAYREF, optional => 0, }, # cache names (can be one).
             'item_key' => { type => ARRAYREF, optional => 0, }, # item keys (can be one).
             'item_increment' => { type => SCALAR, optional => 0, }, # increment item by this value.
@@ -385,7 +421,7 @@ sub increment_item {
     # FIXME %output
     my %output;
     my %results;
-    my %items_and_caches = prepare_items_and_caches(%params);
+    my %items_and_caches = _prepare_items_and_caches(%params);
     $log->debugf('put_item(): items_and_caches=%s', \%items_and_caches);
     my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
     $parallel_exe->share(\%results);
@@ -396,7 +432,7 @@ sub increment_item {
         my $value = $items_and_caches{$key};
         my %result;
         eval {
-            %result = increment_item_thread('item_info' => $value, 'pointer_to_params' => \%params);
+            %result = _increment_item_thread('item_info' => $value, 'pointer_to_params' => \%params);
         };
         if($EVAL_ERROR) {
             print $EVAL_ERROR;
@@ -420,26 +456,26 @@ sub increment_item {
     return %output;
 }
 
-sub get_item_thread {
+sub _get_item_thread {
     my %params = validate(
         @_, {
             'get_item_values' => { type => HASHREF, optional => 0, },
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
         }
     );
-    $log->tracef('Entering get_item_thread(%s)', \%params);
+    $log->tracef('Entering _get_item_thread(%s)', \%params);
 
     my %result;
     my $cache_name = $params{'get_item_values'}->{'cache_name'};
     my $item_key = $params{'get_item_values'}->{'item_key'};
-    $log->debugf('get_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
-    my $client = prepare_client(%{$params{'pointer_to_params'}});
-    my $cache = get_cache_safely('client' => $client, 'cache_name' => $cache_name);
+    $log->debugf('_get_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
+    my $client = _prepare_client(%{$params{'pointer_to_params'}});
+    my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
     if($cache) {
-        my $item = get_item_safely('cache' => $cache, 'item_key' => $item_key);
+        my $item = _get_item_safely('cache' => $cache, 'item_key' => $item_key);
         if($item) {
-            $log->debugf("get_item_thread(): Finished getting item \'%s\' from cache \'%s\'.", $item_key, $cache_name);
-            $log->debugf("get_item_thread(): Item content: \'%s\'.'.", $item->value());
+            $log->debugf("_get_item_thread(): Finished getting item \'%s\' from cache \'%s\'.", $item_key, $cache_name);
+            $log->debugf("_get_item_thread(): Item content: \'%s\'.'.", $item->value());
             $params{'get_item_values'}->{'value'} = $item->value();
             $result{'value'} = $item->value();
         }
@@ -454,6 +490,12 @@ sub get_item_thread {
     } # if cache else
     return %result;
 }
+
+=head2 get_item
+
+get item function.
+
+=cut
 
 sub get_item {
     my %params = validate(
@@ -470,7 +512,7 @@ sub get_item {
     # FIXME %output
     my %output;
     my %results;
-    my %items_and_caches = prepare_items_and_caches(%params);
+    my %items_and_caches = _prepare_items_and_caches(%params);
     $log->debugf('get_item(): items_and_caches=%s', \%items_and_caches);
     my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
     $parallel_exe->share(\%items_and_caches);
@@ -482,7 +524,7 @@ sub get_item {
         my $value = $items_and_caches{$key};
         my %result;
         eval {
-            %result = get_item_thread('get_item_values' => $value, 'pointer_to_params' => \%params);
+            %result = _get_item_thread('get_item_values' => $value, 'pointer_to_params' => \%params);
         };
         if($EVAL_ERROR) {
             print $EVAL_ERROR;
@@ -509,26 +551,26 @@ sub get_item {
     return %output;
 }
 
-sub delete_item_thread {
+sub _delete_item_thread {
     my %params = validate(
         @_, {
             'item_info' => { type => HASHREF, optional => 0, },
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
         }
     );
-    $log->tracef('Entering delete_item_thread(%s)', \%params);
+    $log->tracef('Entering _delete_item_thread(%s)', \%params);
 
     my %result;
     my $cache_name = $params{'item_info'}->{'cache_name'};
     my $item_key = $params{'item_info'}->{'item_key'};
-    $log->debugf('delete_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
-    my $client = prepare_client(%{$params{'pointer_to_params'}});
-    my $cache = get_cache_safely('client' => $client, 'cache_name' => $cache_name);
+    $log->debugf('_delete_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
+    my $client = _prepare_client(%{$params{'pointer_to_params'}});
+    my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
     if($cache) {
-        my $rval = operate_item_safely('cache' => $cache,
+        my $rval = _operate_item_safely('cache' => $cache,
             'item_key' => $item_key, 'operation' => OPERATION_DELETE, );
         if($rval) {
-            # Attn. operate_item_safely returns undef if alright, otherwise error message.
+            # Attn. _operate_item_safely returns undef if alright, otherwise error message.
             $result{'error'} = $rval;
         }
     }
@@ -538,6 +580,12 @@ sub delete_item_thread {
     } # if cache else
     return %result;
 }
+
+=head2 delete_item
+
+delete item function.
+
+=cut
 
 sub delete_item {
     my %params = validate(
@@ -549,24 +597,24 @@ sub delete_item {
             'item_key' => { type => ARRAYREF, optional => 0, }, # item key.
         }
     );
-    $log->tracef('Entering delete_item(%s)', \%params);
+    $log->tracef('Entering _delete_item(%s)', \%params);
 
     # FIXME %output
     my %output;
     my %results;
-    my %items_and_caches = prepare_items_and_caches(%params);
-    $log->debugf('delete_item(): items_and_caches=%s', \%items_and_caches);
+    my %items_and_caches = _prepare_items_and_caches(%params);
+    $log->debugf('_delete_item(): items_and_caches=%s', \%items_and_caches);
     my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
     $parallel_exe->share(\%items_and_caches);
     $parallel_exe->share(\%results);
     my @keys = keys %items_and_caches;
-    $log->debugf('delete_item(): keys=%s', \@keys);
+    $log->debugf('_delete_item(): keys=%s', \@keys);
     my @rval_results = $parallel_exe->foreach(\@keys, sub {
         my $key = $_;
         my $value = $items_and_caches{$key};
         my %result;
         eval {
-            %result = delete_item_thread('item_info' => $value, 'pointer_to_params' => \%params);
+            %result = _delete_item_thread('item_info' => $value, 'pointer_to_params' => \%params);
         };
         if($EVAL_ERROR) {
             print $EVAL_ERROR;
@@ -578,21 +626,21 @@ sub delete_item {
         }
     });
 
-    $log->debugf('delete_item(): All parallel loops processed.');
-    $log->debugf('delete_item(): results=%s', \%results);
+    $log->debugf('_delete_item(): All parallel loops processed.');
+    $log->debugf('_delete_item(): results=%s', \%results);
     my @sorted_keys = sort { $items_and_caches{$a}->{'order'} <=> $items_and_caches{$b}->{'order'}} keys %items_and_caches;
     foreach my $sorted_key (@sorted_keys) {
         if(exists $results{$sorted_key}->{'error'}) {
             print $results{$sorted_key}->{'error'} . "\n";
         }
     }
-    $log->tracef('Exiting delete_item():%s', \%output);
+    $log->tracef('Exiting _delete_item():%s', \%output);
     return %output;
 }
 
 ### Internals
 
-sub common_arguments {
+sub _common_arguments {
     return (
             'config' => { type => SCALAR, optional => 1, }, # config file name.
             'policies' => { type => SCALAR, optional => 1, }, # policy file name.
@@ -610,7 +658,7 @@ sub common_arguments {
 #};
 
 # TODO rename cache_name => names, key => keys
-sub prepare_items_and_caches {
+sub _prepare_items_and_caches {
     my %params = validate_with(
         'params' => \@_, 'spec' => {
             'cache_name' => { type => ARRAYREF, optional => 0, }, # cache name (or string with wildcards?).
@@ -635,10 +683,10 @@ sub prepare_items_and_caches {
     return %arranged_order;   
 }
 
-sub prepare_client {
+sub _prepare_client {
     my %params = validate_with(
         'params' => \@_, 'spec' => {
-            common_arguments(),
+            _common_arguments(),
         }, 'allow_extra' => 1,
     );
     my %cache_params;
@@ -648,25 +696,25 @@ sub prepare_client {
 }
 
 # Return undef if cache with given name does not exist.
-sub get_cache_safely {
+sub _get_cache_safely {
     my %params = validate(
         @_, {
             'client' => { type => OBJECT, isa => 'IO::Iron::IronCache::Client', optional => 0, }, # client.
             'cache_name' => { type => SCALAR, optional => 0, }, # cache name.
         }
     );
-    $log->tracef("'Entering get_cache_safely(): %s.'.", \%params);
+    $log->tracef("'Entering _get_cache_safely(): %s.'.", \%params);
 
     my $cache;
     try {
         $cache = $params{'client'}->get_cache('name' => $params{'cache_name'});
     }
     catch {
-        $log->debugf('get_cache_safely(): Caught exception:%s', $_);
+        $log->debugf('_get_cache_safely(): Caught exception:%s', $_);
         croak $_ unless blessed $_ && $_->can('rethrow'); ## no critic (ControlStructures::ProhibitPostfixControls)
         if ( $_->isa('IronHTTPCallException') ) {
             if( $_->status_code == HTTP_NOT_FOUND ) {
-                $log->debugf('get_cache_safely(): Exception: 404 Cache not found.');
+                $log->debugf('_get_cache_safely(): Exception: 404 Cache not found.');
                 return;
             }
             else {
@@ -680,30 +728,30 @@ sub get_cache_safely {
     finally {
     };
 
-    $log->tracef("'Exiting get_cache_safely(): %s.'.", $cache);
+    $log->tracef("'Exiting _get_cache_safely(): %s.'.", $cache);
     return $cache;
 }
 
 # Return undef if item with given name does not exist.
-sub get_item_safely {
+sub _get_item_safely {
     my %params = validate(
         @_, {
             'cache' => { type => OBJECT, isa => 'IO::Iron::IronCache::Cache', optional => 0, }, # cache.
             'item_key' => { type => SCALAR, optional => 0, }, # item key.
         }
     );
-    $log->tracef("'Entering get_item_safely(): %s.'.", \%params);
+    $log->tracef("'Entering _get_item_safely(): %s.'.", \%params);
 
     my $item;
     try {
         $item = $params{'cache'}->get('key' => $params{'item_key'});
     }
     catch {
-        $log->debugf('get_item_safely(): Caught exception:%s', $_);
+        $log->debugf('_get_item_safely(): Caught exception:%s', $_);
         croak $_ unless blessed $_ && $_->can('rethrow'); ## no critic (ControlStructures::ProhibitPostfixControls)
         if ( $_->isa('IronHTTPCallException') ) {
             if( $_->status_code == HTTP_NOT_FOUND ) {
-                $log->debugf('get_item_safely(): Exception: 404 Key not found.');
+                $log->debugf('_get_item_safely(): Exception: 404 Key not found.');
                 return;
             }
             else {
@@ -716,13 +764,13 @@ sub get_item_safely {
     }
     finally {
     };
-    $log->tracef("'Exiting get_item_safely(): %s.'.", $item);
+    $log->tracef("'Exiting _get_item_safely(): %s.'.", $item);
     return $item;
 }
 
 # Do put, increment, delete
 # Return undef if everything alright. Otherwise error string.
-sub operate_item_safely {
+sub _operate_item_safely {
     my %params = validate(
         @_, {
             'cache' => { type => OBJECT, isa => 'IO::Iron::IronCache::Cache', optional => 0, }, # cache.
@@ -739,7 +787,7 @@ sub operate_item_safely {
         || ($params{'operation'} eq OPERATION_INCREMENT && $params{'increment'} && !$params{'item'})
         || ($params{'operation'} eq OPERATION_DELETE && !$params{'item'} && !$params{'increment'})
         , 'We have the parameters required for the requested operation.');
-    $log->tracef("'Entering operate_item_safely(): %s.'.", \%params);
+    $log->tracef("'Entering _operate_item_safely(): %s.'.", \%params);
 
     try {
         if($params{'operation'} eq OPERATION_PUT) {
@@ -753,18 +801,18 @@ sub operate_item_safely {
         }
     }
     catch {
-        $log->debugf('operate_item_safely(): Caught exception:%s', $_);
+        $log->debugf('_operate_item_safely(): Caught exception:%s', $_);
         croak $_ unless blessed $_ && $_->can('rethrow'); ## no critic (ControlStructures::ProhibitPostfixControls)
         if ( $_->isa('IronHTTPCallException') ) {
             if( $_->status_code == HTTP_NOT_FOUND ) {
-                $log->warnf('operate_item_safely(): Exception: 404 Key not found.');
+                $log->warnf('_operate_item_safely(): Exception: 404 Key not found.');
                 # Does can it happen? To delete?
                 return 'Key not found.';
             }
             elsif( $_->status_code == HTTP_BAD_REQUEST 
                     && $_->response_message eq 'Cannot increment or decrement non-numeric value'
                 ) {
-                $log->warnf('operate_item_safely(): Exception: 400 Item not suitable for incrementation.');
+                $log->warnf('_operate_item_safely(): Exception: 400 Item not suitable for incrementation.');
                 return 'Item not suitable for incrementation.';
             }
             else {
@@ -777,9 +825,11 @@ sub operate_item_safely {
     }
     finally {
     };
-    $log->tracef("'Exiting operate_item_safely():.'.");
+    $log->tracef("'Exiting _operate_item_safely():.'.");
     return;
 }
+
+=pod comment
 
 sub get_item_old {
     my %params = validate(
@@ -793,17 +843,17 @@ sub get_item_old {
     );
     $log->tracef('Entering get_item(%s)', \%params);
 
-    my $client = prepare_client(%params);
-    my %items_and_caches = prepare_items_and_caches(%params);
+    my $client = _prepare_client(%params);
+    my %items_and_caches = _prepare_items_and_caches(%params);
     my %output = ( 'project_id' => $client->project_id(), 'caches' => {} );
     foreach my $cache_name (@{$params{'cache_name'}}) {
         $log->debugf("get_item(): From cache: \'%s\'.'.", $cache_name);
-        my $cache = get_cache_safely('client' => $client, 'cache_name' => $cache_name);
+        my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
         if($cache) {
             $output{'caches'}->{$cache_name} = { 'items' => {} };
             foreach my $item_key (@{$params{'item_key'}}) {
                 $log->debugf("get_item(): Item: \'%s\'.'.", $item_key);
-                my $item = get_item_safely('cache' => $cache, 'item_key' => $item_key);
+                my $item = _get_item_safely('cache' => $cache, 'item_key' => $item_key);
                 if($item) {
                     $log->debugf("get_item(): Finished getting item \'%s\' from cache \'%s\'.", $item_key, $cache_name);
                     $log->debugf("get_item(): Item content: \'%s\'.'.", $item->value());
@@ -891,5 +941,7 @@ sub put_item_old {
     $log->tracef('Exiting put_item():%s', \%output);
     return %output;
 }
+
+=cut
 
 1;

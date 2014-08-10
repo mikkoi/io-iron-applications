@@ -10,7 +10,7 @@ use Test::More;
 #use lib 'integ_t';
 #require 'iron_io_integ_tests_common.pl';
 use lib 'lib';
-use lib '../io-iron-git/lib';
+use lib '../io-iron/lib';
 
 plan tests => 1;
 

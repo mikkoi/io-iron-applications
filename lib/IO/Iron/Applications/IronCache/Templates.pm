@@ -19,29 +19,29 @@ END {
 
 my $LINEFEED = qq{\n};
 
-sub list_caches_template {
+sub _list_caches_template {
     return '[% FOREACH cache_name IN data.caches.keys.sort %]'
             . '[% cache_name %]' . $LINEFEED 
             . '[% END %]'
             ;
 }
 
-sub list_items_template {
+sub _list_items_template {
     return "[% USE timestamp = date(format => '%Y-%B-%d') %][% FILTER format('%-30s') %]Cache[% END %][% FILTER format('%-30s') %]Item[% END %][% FILTER format('%-25s') %]expires[% END %]value\n"
             . "[% FOREACH cache_name IN data.caches.keys.sort %]"
             . "[% cache = data.caches.item(cache_name) %]"
             . "[% IF cache.error %]"
-            . "[% cache_name %]:[% cache.error %]\n"
+            . "[% cache_name %]:[% cache.error %]" . $LINEFEED
             . "[% ELSE %]"
             . "[% FOREACH item_key IN cache.items.keys.sort %]"
             . "[% item = cache.items.item(item_key) %]"
             . "[% IF item.error %]"
-            . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %][% item_key %]:[% item.error %]\n"
+            . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %][% item_key %]:[% item.error %]" . $LINEFEED
             . "[% ELSE %]"
             . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %]"
             . "[% FILTER format('%-25s') %][% item_key %][% END %]"
             . "[% FILTER format('%-25s') %][% item.expires %][% END %]"
-            . "[% item.value %]\n"
+            . "[% item.value %]" . $LINEFEED
             . "[% END %][%# /IF item.error %]"
             . "[% END %][%# /FOREACH %]"
             . "[% END %][%# /IF cache.error %]"
@@ -49,14 +49,14 @@ sub list_items_template {
             ;
 }
 
-sub show_cache_template {
-    return "[% USE timestamp = date(format => '%Y-%B-%d') %][% FILTER format('%-30s') %]Name[% END %][% FILTER format('%-25s') %]id[% END %][% FILTER format('%-5s') %]size[% END %][% FILTER format('%-6s') %]dsize[% END %][% FILTER format('%-12s') %]created[% END %]\n"
+sub _show_cache_template {
+    return "[% USE timestamp = date(format => '%Y-%B-%d') %][% FILTER format('%-30s') %]Name[% END %][% FILTER format('%-25s') %]id[% END %][% FILTER format('%-5s') %]size[% END %][% FILTER format('%-6s') %]dsize[% END %][% FILTER format('%-12s') %]created[% END %]" . $LINEFEED
             . "[% FOREACH cache_name IN data.caches.keys.sort %]"
             . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %]"
             . "[% FILTER format('%-25s') %][% data.caches.item(cache_name).id %][% END %]"
             . "[% FILTER format('%-5s') %][% data.caches.item(cache_name).size %][% END %]"
             . "[% FILTER format('%-6s') %][% data.caches.item(cache_name).data_size %][% END %]"
-            . "[% FILTER format('%-12s') %][% timestamp.format(data.caches.item(cache_name).created_at) %][% END %]\n"
+            . "[% FILTER format('%-12s') %][% timestamp.format(data.caches.item(cache_name).created_at) %][% END %]" . $LINEFEED
             . "[% END %]"
             ;
 }
@@ -64,25 +64,25 @@ sub show_cache_template {
 # Attn. These four functions which operate "simple" operations on items
 # do not have anything to pring, except get_item 
 # which only outputs the item's (or items') content.
-sub put_item_template {
+sub _put_item_template {
     return '';
 }
 
-sub increment_item_template {
+sub _increment_item_template {
     return '';
 }
 
-sub delete_item_template {
+sub _delete_item_template {
     return '';
 }
 
-sub get_item_template {
+sub _get_item_template {
     return ""
 # printing is done from inside the executing function!
 #            . "[% FOREACH cache_name IN data.caches.keys.sort %]"
 #            . "[% cache = data.caches.item(cache_name) %]"
 #            . "[% IF cache.error %]"
-#            . "[% cache_name %]:[% cache.error %]\n"
+#            . "[% cache_name %]:[% cache.error %]" . $LINEFEED
 #            . "[% ELSE %]"
 #            . "[% FOREACH item_key IN cache.items.keys.sort %]"
 #            . "[% item = cache.items.item(item_key) %]"
@@ -90,7 +90,7 @@ sub get_item_template {
 #            . "[% item_key %]:[% item.error %]"
 #            . "[% ELSE %]"
 #            . "[% item.value %]"
-#            . "[% END %][%# /IF item.error %]\n" # Attn. The linefeed is here!
+#            . "[% END %][%# /IF item.error %]" . $LINEFEED # Attn. The linefeed is here!
 #            . "[% END %][%# /FOREACH %]"
 #            . "[% END %][%# /IF cache.error %]"
 #            . "[% END %][%# /FOREACH %]"

@@ -82,7 +82,7 @@ sub validate_args {
     $self->usage_error("wrong arguments") unless ($args->[0] eq 'caches' || $args->[0] eq 'items');
     $self->usage_error("missing cache name (must have)") if ($args->[0] eq 'items' && !defined $opt->{'cache'});
     $self->usage_error("missing item name (must have)") if ($args->[0] eq 'items' && !defined $args->[1]);
-    $self->usage_error("Wrong number of arguments") if ($args->[0] eq 'caches' && @$args > 1);
+    $self->usage_error("Wrong number of arguments") if ($args->[0] eq 'caches' && scalar @{$args} > 1);
 }
 
 sub execute {
@@ -103,7 +103,7 @@ sub execute {
         print $self->combine_template("list_caches", \%output);
     }
     elsif($args->[0] eq 'items') {
-        $parameters{'item_key'} = [ split q{,}, $args->[1] ] if (@$args > 1); # expects array
+        $parameters{'item_key'} = [ split q{,}, $args->[1] ] if (scalar @{$args} > 1); # expects array
         $parameters{'cache_name'} = [ split q{,}, $opts->{'cache'} ]; # expects array;
         %output = IO::Iron::Applications::IronCache::Functionality::list_items(%parameters);
         print $self->combine_template("list_items", \%output);

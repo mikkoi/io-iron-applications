@@ -47,7 +47,8 @@ use Exception::Class (
       }
   );
 
-require IO::Iron::Common;
+use IO::Iron::Common ();
+use IO::Iron::Applications::IronCache::Functionality ();
 
 # CONSTANTS
 

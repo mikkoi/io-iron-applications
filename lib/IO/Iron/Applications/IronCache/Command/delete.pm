@@ -47,7 +47,7 @@ sub opt_spec {
 
 sub validate_args {
 	my ($self, $opt, $args) = @_;
-	$self->usage_error("wrong number of arguments") unless @$args == 2;
+	$self->usage_error("wrong number of arguments") unless scalar @{$args} == 2;
 	$self->usage_error("invalid arguments") unless ($args->[0] eq 'item');
     $self->usage_error("missing cache name") unless (defined $opt->{'cache'});
 }

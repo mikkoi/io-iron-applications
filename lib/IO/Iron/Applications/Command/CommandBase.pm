@@ -114,7 +114,6 @@ sub opt_spec_base {
         [ "config|c=s",    "Load Iron.io config from this file", ],
         [ "policies=s",     "Load policies from this file", ],
         [ "no-policy",    "Don't use policy to validate requests", { default => 0 }, ],
-        #[ "values|v=s@",    "starting values", { default => [ 0, 1, 3 ] } ],
         [ "verbose",    "Give me information as things happen", { default => 0 } ],
         [ "debug",    "Give me more information as things happen", { default => 0 } ],
         [ "trace",    "Give me even more information as things happen", { default => 0 } ],

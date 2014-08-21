@@ -24,7 +24,8 @@ use Data::Dumper; $Data::Dumper::Maxdepth = 2;
 
 diag("Testing IO::Iron::Applications::IronCache, Perl $], $^X");
 
-my $config_file_name = '..\io-iron\iron_cache.json';
+my $config_file_name = 'iron_cache.json';
+BAIL_OUT("File " . $config_file_name . " not exists! Quitting...") if(!-e $config_file_name);;
 my $policies_file_name = 'iron_cache_policies.json';
 my $policies_file_content = <<END_OF_CONTENT;
 {
@@ -34,7 +35,7 @@ my $policies_file_content = <<END_OF_CONTENT;
     "character_group":{
         "[:lim_uchar:]":"ABC",
         "[:low_digit:]":"0123"
-    }
+    },
     "cache":{
         "name":[
             "cache_01_main",
@@ -101,7 +102,8 @@ subtest 'Testing' => sub {
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
     #diag(Dumper($result));
     is($result->stdout(), "25\n15\n10\nKey not exists.\n", 'Stdout has the value.');
-    is($result->stderr(), "Item '$item_key_02' does not exist in cache '$cache_name_02'.", 'Print warning to stderr.');
+    # This error would be produced if logging was activated: "Item '$item_key_02' does not exist in cache '$cache_name_02'."
+    is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
     @cmd_line_array = ('delete', 'item', "$item_key_01,$item_key_02",

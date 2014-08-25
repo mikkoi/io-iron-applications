@@ -105,7 +105,7 @@ sub usage_desc {
 
 =head2 opt_spec_base
 
-The options shared by all subcommands.
+The options shared by all sub commands.
 
 =cut
 

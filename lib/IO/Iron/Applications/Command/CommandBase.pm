@@ -122,12 +122,24 @@ sub opt_spec_base {
     );
 }
 
+=head2 validate_args_base
+
+Call this in the inheriting classes' validate_args method before any other validation.
+
+=cut
+
 sub validate_args_base {
     my ($self, $opt, $args) = @_;
     # we need at least one argument beyond the options; die with that message
     # and the complete "usage" text describing switches, etc
     $self->usage_error("Help Requested") if defined $opt->{'help'} && $opt->{'help'};
 }
+
+=head2 validate_args
+
+Validate the arguments (and options/flags) if required.
+
+=cut
 
 sub validate_args {
     my ($self, $opt, $args) = @_;

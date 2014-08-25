@@ -101,13 +101,13 @@ sub list_items {
     if($params{'alternatives'}) {
         my $client = _prepare_client(%params);
         if($client->is_item_key_alternatives()) {
-            expand_item_keys('pointer_to_params' => \%params, 'client' => $client);
+            _expand_item_keys('pointer_to_params' => \%params, 'client' => $client);
         }
         else {
             $log->warnf('No limiting policy used. Cannot print alternatives.');
         }
         if($client->is_cache_name_alternatives()) {
-            expand_cache_names('pointer_to_params' => \%params, 'client' => $client);
+            _expand_cache_names('pointer_to_params' => \%params, 'client' => $client);
         }
         else {
             $log->warnf('No limiting policy used. Cannot print alternatives.');
@@ -124,13 +124,13 @@ sub list_items {
         my %results;
         my $client = _prepare_client(%params);
         if($client->is_item_key_alternatives()) {
-            expand_item_keys('pointer_to_params' => \%params, 'client' => $client);
+            _expand_item_keys('pointer_to_params' => \%params, 'client' => $client);
         }
         else {
             $log->warnf('No limiting policy used. Cannot print alternatives.');
         }
         if($client->is_cache_name_alternatives()) {
-            expand_cache_names('pointer_to_params' => \%params, 'client' => $client);
+            _expand_cache_names('pointer_to_params' => \%params, 'client' => $client);
         }
         else {
             $log->warnf('No limiting policy used. Cannot print alternatives.');
@@ -170,14 +170,14 @@ sub list_items {
     return %output;
 }
 
-sub expand_cache_names {
+sub _expand_cache_names {
     my %params = validate_with(
         'params' => \@_, 'spec' => {
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
             'client' => { type => OBJECT, optional => 0, }, # ref to IronCache client.
         }, 'allow_extra' => 1,
     );
-    $log->tracef('Entering expand_cache_names(%s)', \%params);
+    $log->tracef('Entering _expand_cache_names(%s)', \%params);
     my @alternatives = $params{'client'}->cache_name_alternatives();
     my @valid_alternatives;
     foreach my $alternative (@alternatives) {
@@ -188,18 +188,18 @@ sub expand_cache_names {
         }
     }
     $params{'pointer_to_params'}->{'cache_name'} = \@valid_alternatives;
-    $log->tracef('Exiting expand_cache_names():%s', '[UNDEF]');
+    $log->tracef('Exiting _expand_cache_names():%s', '[UNDEF]');
     return;
 }
 
-sub expand_item_keys {
+sub _expand_item_keys {
     my %params = validate_with(
         'params' => \@_, 'spec' => {
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
             'client' => { type => OBJECT, optional => 0, }, # ref to IronCache client.
         }, 'allow_extra' => 1,
     );
-    $log->tracef('Entering expand_item_keys(%s)', \%params);
+    $log->tracef('Entering _expand_item_keys(%s)', \%params);
     my @alternatives = $params{'client'}->item_key_alternatives();
     my @valid_alternatives;
     foreach my $alternative (@alternatives) {
@@ -210,7 +210,7 @@ sub expand_item_keys {
         }
     }
     $params{'pointer_to_params'}->{'item_key'} = \@valid_alternatives;
-    $log->tracef('Exiting expand_item_keys():%s', \@valid_alternatives);
+    $log->tracef('Exiting _expand_item_keys():%s', \@valid_alternatives);
     return @valid_alternatives;
 }
 

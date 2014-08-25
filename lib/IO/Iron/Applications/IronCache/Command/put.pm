@@ -29,7 +29,7 @@ use Data::Dumper;
 use IO::Iron::Applications::IronCache -command;
 
 sub description {
-	return "Put an item to a cache.";
+	return "Put item(s) to cache(s).";
 }
 
 sub usage_desc { 
@@ -52,6 +52,7 @@ sub opt_spec {
 
 sub validate_args {
 	my ($self, $opt, $args) = @_;
+    $self->validate_args_base($opt, $args);
 	$self->usage_error("wrong number of arguments") unless scalar @{$args} == 2;
 	$self->usage_error("invalid arguments") unless ($args->[0] eq 'item');
     $self->usage_error("missing cache name") unless (defined $opt->{'cache'});
@@ -71,10 +72,19 @@ sub execute {
     $parameters{'no-policy'} = $opts->{'no-policy'};
     $parameters{'item_key'} = [ split q{,}, $args->[1] ]; # expects array
     $parameters{'cache_name'} = [ split q{,}, $opts->{'cache'} ]; # expects array
-    $parameters{'item_value'} = $opts->{'value'} if defined $opts->{'value'};
+    #$parameters{'item_value'} = $opts->{'value'} if defined $opts->{'value'};
     $parameters{'create_cache'} = $opts->{'create_cache'};
     $parameters{'expires_in'} = $opts->{'expires_in'} if defined $opts->{'expires_in'};
     # TODO Missing parameters replace/add.
+    if(defined $opts->{'value'}) {
+        $parameters{'item_value'} = $opts->{'value'}
+    }
+    else {
+        while(<STDIN>) {
+            chomp;
+            $parameters{'item_value'} .= $_;
+        }
+    }
     my %output;
     %output = IO::Iron::Applications::IronCache::Functionality::put_item(%parameters);
 

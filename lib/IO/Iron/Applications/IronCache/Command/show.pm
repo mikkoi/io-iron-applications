@@ -49,27 +49,23 @@ use Exception::Class (
 require IO::Iron::IronCache::Client;
 
 sub description {
-	return "Show an IronCache";
+	return "Show information about cache(s).";
 }
 
 sub usage_desc { 
 	my ($self, $opt, $args) = @_;
-	#print Dumper(@_);
 	return $opt->arg0() . " %o show cache cache_name[,cache_name][,name_with_wildcards]";
 }
 
 sub opt_spec {
 	return (
         IO::Iron::Applications::Command::CommandBase::opt_spec_base(),
-	#	[ "skip-refs|R",	"skip reference checks during init", ],
-	#	[ "values|v=s@",	"starting values", { default => [ 0, 1, 3 ] } ],
 	);
 }
 
 sub validate_args {
 	my ($self, $opt, $args) = @_;
-	# we need at least one argument beyond the options; die with that message
-	# and the complete "usage" text describing switches, etc
+    $self->validate_args_base($opt, $args);
 	$self->usage_error("wrong number of arguments") unless scalar @{$args} == 2;
 	$self->usage_error("invalid arguments") unless ($args->[0] eq 'cache');
 }
@@ -85,7 +81,7 @@ sub execute {
     $parameters{'config'} = $opts->{'config'} if defined $opts->{'config'};
     $parameters{'policies'} = $opts->{'policies'} if defined $opts->{'policies'};
     $parameters{'no-policy'} = $opts->{'no-policy'};
-    $parameters{'cache_name'} = $args->[1] if ($args->[0] eq 'cache' && scalar {$args} > 1);
+    $parameters{'cache_name'} = $args->[1] if ($args->[0] eq 'cache' && scalar @{$args} > 1);
     my %output;
     %output = IO::Iron::Applications::IronCache::Functionality::show_cache(%parameters);
 

@@ -19,7 +19,7 @@ use App::Cmd::Tester;
 use File::Slurp qw();
 use IO::Iron::Applications::IronCache;
 
-#use Log::Any::Adapter ('Stderr'); # Activate to get all log messages.
+use Log::Any::Adapter ('Stderr'); # Activate to get all log messages.
 use Data::Dumper; $Data::Dumper::Maxdepth = 2;
 
 diag("Testing IO::Iron::Applications::IronCache, Perl $], $^X");
@@ -39,11 +39,11 @@ my $policies_file_content = <<END_OF_CONTENT;
     "cache":{
         "name":[
             "cache_01_main",
-            "cache_[[:alpha:]]{1}[[:digit:]]{2}"
+            "cache_[:alpha:]{1}[:digit:]{2}"
         ],
         "item_key":[
-            "item.01_[[:digit:]]{2}",
-            "item.02_[[:lim_uchar:]]{1,2}"
+            "item.01_[:digit:]{2}",
+            "item.02_[:lim_uchar:]{1,2}"
         ]
     }
 }
@@ -65,7 +65,7 @@ my $item_value_01 = '15';
 my $item_value_02 = '-95';
 
 subtest 'Testing' => sub {
-    plan tests => 12;
+    plan tests => 20;
 
 #    my $test = Test::Cmd->new(workdir => '', prog => 'blib/script/base64');
 #ok($test, 'Made Test::Cmd object');
@@ -75,9 +75,11 @@ subtest 'Testing' => sub {
 
     my @cmd_line_array;
     my $result;
-    @cmd_line_array = ('put', 'item', "$item_key_01,$item_key_02",
-            '--cache', $cache_name_01,
-            '--value', '15', '--create-cache',
+
+    # This is just to create the three caches.
+    @cmd_line_array = ('put', 'item', "$item_key_01",
+            '--cache', "$cache_name_01,$cache_name_02,$cache_name_03",
+            '--value', '10', '--create-cache',
             '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
@@ -85,7 +87,42 @@ subtest 'Testing' => sub {
     is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
-    @cmd_line_array = ('increment', 'item', "$item_key_01",
+    # list the three caches.
+    @cmd_line_array = ('list', 'caches', 
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    like($result->stdout(), qr/^$cache_name_01$/sx, 'Print cache 01 to stdout.');
+    like($result->stdout(), qr/^$cache_name_02$/sx, 'Print cache 01 to stdout.');
+    like($result->stdout(), qr/^$cache_name_03$/sx, 'Print cache 01 to stdout.');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
+
+    # list the three items with their values.
+    @cmd_line_array = ('list', 'items', "$item_key_01",
+            '--cache', "$cache_name_01,$cache_name_02,$cache_name_03",
+            '--show-value', 
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    like($result->stdout(), qr/^$cache_name_01.*$item_key_01.*10$/sx, 'List item.');
+    like($result->stdout(), qr/^$cache_name_02.*$item_key_01.*10$/sx, 'List item.');
+    like($result->stdout(), qr/^$cache_name_03.*$item_key_01.*10$/sx, 'List item.');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
+
+    # Get items (only value)
+    @cmd_line_array = ('get', 'item', "$item_key_01,$item_key_02",
+            '--cache', $cache_name_01,
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    is($result->stdout(), '10\nKey not exists.\n', 'Print item values');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
+
+    # Increment values (inc one item, create three items.)
+    @cmd_line_array = ('increment', 'item', "$item_key_01,$item_key_02",
             '--cache', "$cache_name_01,$cache_name_02",
             '--value', '10',
             '--config', $config_file_name, '--policies', $policies_file_name );
@@ -95,19 +132,20 @@ subtest 'Testing' => sub {
     is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
+    # Get four items. Two different values.
     @cmd_line_array = ('get', 'item', "$item_key_01,$item_key_02",
             '--cache', "$cache_name_01,$cache_name_02",
             '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
     #diag(Dumper($result));
-    is($result->stdout(), "25\n15\n10\nKey not exists.\n", 'Stdout has the value.');
-    # This error would be produced if logging was activated: "Item '$item_key_02' does not exist in cache '$cache_name_02'."
+    is($result->stdout(), "20\n10\n10\n10\n", 'Stdout has the value.');
     is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
-    @cmd_line_array = ('delete', 'item', "$item_key_01,$item_key_02",
-            '--cache', "$cache_name_01,$cache_name_02",
+    # Delete one item.
+    @cmd_line_array = ('delete', 'item', "$item_key_01",
+            '--cache', "$cache_name_01",
             '--config', $config_file_name, '--policies', $policies_file_name );
     diag("Command line: " . (join ' ', @cmd_line_array));
     $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
@@ -116,6 +154,44 @@ subtest 'Testing' => sub {
     is($result->stderr(), '', 'Print nothing to stderr.');
     is($result->exit_code(), 0, 'Exit code is 0.');
 
+    # Clear cache
+    @cmd_line_array = ('clear', 'cache', "$cache_name_01,$cache_name_02",
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    #diag(Dumper($result));
+    is($result->stdout(), '', 'Print nothing to stdout.');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
+
+    @cmd_line_array = ('list', 'items', '.*', '--cache', "$cache_name_01",
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    #diag(Dumper($result));
+    is($result->stdout(), '', 'Print nothing to stdout.');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
+
+    @cmd_line_array = ('delete', 'cache', "$cache_name_01,$cache_name_02,$cache_name_03",
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    #diag(Dumper($result));
+    is($result->stdout(), '', 'Print nothing to stdout.');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
+
+    # list the three caches.
+    @cmd_line_array = ('list', 'caches', 
+            '--config', $config_file_name, '--policies', $policies_file_name );
+    diag("Command line: " . (join ' ', @cmd_line_array));
+    $result = test_app('IO::Iron::Applications::IronCache' => \@cmd_line_array);
+    unlike($result->stdout(), qr/^$cache_name_01$/sx, 'Print cache 01 to stdout.');
+    unlike($result->stdout(), qr/^$cache_name_02$/sx, 'Print cache 01 to stdout.');
+    unlike($result->stdout(), qr/^$cache_name_03$/sx, 'Print cache 01 to stdout.');
+    is($result->stderr(), '', 'Print nothing to stderr.');
+    is($result->exit_code(), 0, 'Exit code is 0.');
 
 };
 

@@ -29,7 +29,7 @@ use Data::Dumper;
 use IO::Iron::Applications::IronCache -command;
 
 sub description {
-	return "Put an item to a cache.";
+	return "Increment integer item(s) in cache(s).";
 }
 
 sub usage_desc { 
@@ -50,6 +50,7 @@ sub opt_spec {
 
 sub validate_args {
 	my ($self, $opt, $args) = @_;
+    $self->validate_args_base($opt, $args);
 	$self->usage_error("wrong number of arguments") unless scalar @{$args} == 2;
 	$self->usage_error("invalid arguments") unless ($args->[0] eq 'item');
     $self->usage_error("missing cache name") unless (defined $opt->{'cache'});

@@ -49,6 +49,7 @@ use Exception::Class (
 
 use IO::Iron::Common ();
 use IO::Iron::Applications::IronCache::Functionality ();
+use IO::Iron::Applications::IronCache::Templates ();
 
 # CONSTANTS
 
@@ -75,7 +76,7 @@ Describe the command.
 =cut
 
 sub description {
-    return "Show an IronCache";
+    return "Implemented in inheriting class.";
 }
 
 =head2 abstract
@@ -99,8 +100,7 @@ Describe usage of the command.
 =cut
 
 sub usage_desc { 
-    my ($self, $opt, $args) = @_;
-    return $opt->arg0() . " %o show cache [cache name]" ;
+    return "Implemented in inheriting class.";
 }
 
 =head2 opt_spec_base
@@ -111,26 +111,35 @@ The options shared by all subcommands.
 
 sub opt_spec_base {
     return (
+        [ "help",    "This screen", { default => 0 } ],
         [ "config|c=s",    "Load Iron.io config from this file", ],
         [ "policies=s",     "Load policies from this file", ],
         [ "no-policy",    "Don't use policy to validate requests", { default => 0 }, ],
-        [ "verbose",    "Give me information as things happen", { default => 0 } ],
+        [ "warning|warn!",    "Show warnings. Default: on. '--nowarn' to disable.", { default => 1 } ],
+        [ "verbose|info",    "Give me information as things happen", { default => 0 } ],
         [ "debug",    "Give me more information as things happen", { default => 0 } ],
         [ "trace",    "Give me even more information as things happen", { default => 0 } ],
     );
 }
 
-#sub validate_args {
-#    my ($self, $opt, $args) = @_;
-#    # we need at least one argument beyond the options; die with that message
-#    # and the complete "usage" text describing switches, etc
-#    $self->usage_error("too few arguments") unless @$args;
-#}
+sub validate_args_base {
+    my ($self, $opt, $args) = @_;
+    # we need at least one argument beyond the options; die with that message
+    # and the complete "usage" text describing switches, etc
+    $self->usage_error("Help Requested") if defined $opt->{'help'} && $opt->{'help'};
+}
+
+sub validate_args {
+    my ($self, $opt, $args) = @_;
+    # we need at least one argument beyond the options; die with that message
+    # and the complete "usage" text describing switches, etc
+    return "Implemented in inheriting class.";
+}
 
 use Log::Log4perl;
 use Log::Log4perl::Level;
 my $conf = q(
-  log4perl.rootLogger          = WARN, Screen
+  log4perl.rootLogger          = ERROR, Screen
   log4perl.appender.Screen         = Log::Log4perl::Appender::Screen
   log4perl.appender.Screen.stderr  = 0
   log4perl.appender.Screen.layout = Log::Log4perl::Layout::SimpleLayout
@@ -148,6 +157,10 @@ Available options: info, debug, trace.
 
 sub raise_logging_levels_from_options {
     my ($self, $opts) = @_;
+    if($opts->{'warning'} > 0) {
+        Log::Log4perl->get_logger("")->level($WARN);
+        $log->info("Raised logging level to WARN.");
+    }
     if($opts->{'verbose'} > 0) {
         Log::Log4perl->get_logger("")->level($INFO);
         $log->info("Raised logging level to INFO.");
@@ -174,7 +187,6 @@ sub check_for_iron_io_config {
     $log->tracef('Entering check_for_iron_io_config(%s)', $opts);
     my %params;
     $params{'config'} = $opts->{'config'} if defined $opts->{'config'};
-    #my $config_file_given = defined $params{'config'};
     my $config = IO::Iron::Common::get_config(%params);
     if(! defined $config->{'project_id'}) {
         $log->fatalf("Missing config item \'project_id\'. Please check that Iron.io config is accessible (by .json file or environmental variables).");
@@ -199,12 +211,12 @@ my %tt_config = (
 
 =head2 combine_template
 
-Find template of args[1] and combine it with data in the referenced structure of args[2].
+Find template (args[1]) and combine it with data in the referenced structure (args[2]).
 
 =cut
 
 sub combine_template {
-    my ($self, $template_name, $data) = @_;
+    my ($self, $template_name, $data, $instructions) = @_;
     $log->tracef('Entering combine_template(%s,%s)', $template_name, $data);
 
     # Print with TT2
@@ -227,6 +239,7 @@ sub combine_template {
     $log->debugf('combine_template(): Found template:\'%s\'', $tt_template);
     my %tt_input = (
         'data' => $data,
+        'instructions' => $instructions,
     );
     if(! ($tt->process(\$tt_template, \%tt_input, \$tt_output))) {
         $log->debug('\$template->error()=%s.\n', $tt->error());

@@ -56,6 +56,7 @@ sub list_caches {
             'config' => { type => SCALAR, optional => 1, }, # config file name.
             'policies' => { type => SCALAR, optional => 1, }, # policy file name.
             'no-policy' => { type => BOOLEAN, optional => 1, }, # disable all policy checks.
+            'alternatives' => { type => BOOLEAN, optional => 1, }, # only show alternative cache names and item keys.
         }
     );
     $log->tracef('Entering list_caches(%s)', \%params);
@@ -89,85 +90,142 @@ sub list_items {
             'config' => { type => SCALAR, optional => 1, }, # config file name.
             'policies' => { type => SCALAR, optional => 1, }, # policy file name.
             'no-policy' => { type => BOOLEAN, optional => 1, }, # disable all policy checks.
-            'cache_name' => { type => ARRAYREF, optional => 0, }, # cache name.
+            'cache_name' => { type => ARRAYREF, optional => 0, }, # cache name (or string with wildcards?).
             'item_key' => { type => ARRAYREF, optional => 0, }, # item key.
+            'alternatives' => { type => BOOLEAN, optional => 1, }, # only show alternative cache names and item keys.
         }
     );
     $log->tracef('Entering list_items(%s)', \%params);
 
-    my %cache_params;
-    $cache_params{'config'} = $params{'config'} if defined $params{'config'};
-    $cache_params{'policies'} = $params{'policies'} if defined $params{'policies'};
-    my $client = IO::Iron::IronCache::Client->new(%cache_params);
-    my %output = ( 'project_id' => $client->project_id(), 'caches' => {} );
-    foreach my $cache_name (@{$params{'cache_name'}}) {
-        $log->debugf("get_item(): From cache: \'%s\'.'.", $cache_name);
-        my $cache;
-        try {
-            $cache = $client->get_cache('name' => $cache_name);
+    my %output;
+    if($params{'alternatives'}) {
+        my $client = _prepare_client(%params);
+        if($client->is_item_key_alternatives()) {
+            expand_item_keys('pointer_to_params' => \%params, 'client' => $client);
         }
-        catch {
-            $log->debugf('get_item(): Caught exception:%s', $_);
-            croak $_ unless blessed $_ && $_->can('rethrow'); ## no critic (ControlStructures::ProhibitPostfixControls)
-            if ( $_->isa('IronHTTPCallException') ) {
-                if( $_->status_code == HTTP_NOT_FOUND ) {
-                    $log->debugf('get_item(): Exception: 404 Cache not found.');
-                    $log->infof('Cache \'%s\' does not exist. Skip item get ...', $cache_name);
-                }
-                else {
-                    $_->rethrow;
-                }
+        else {
+            $log->warnf('No limiting policy used. Cannot print alternatives.');
+        }
+        if($client->is_cache_name_alternatives()) {
+            expand_cache_names('pointer_to_params' => \%params, 'client' => $client);
+        }
+        else {
+            $log->warnf('No limiting policy used. Cannot print alternatives.');
+        }
+        my %items_and_caches = _prepare_items_and_caches(%params);
+        my @sorted_keys = sort { $items_and_caches{$a}->{'order'} <=> $items_and_caches{$b}->{'order'}} keys %items_and_caches;
+        foreach my $sorted_key (@sorted_keys) {
+            my ($cache_name, $item_key) = split '/', $sorted_key;
+            my %result = ( 'error' => 'Not queried');
+            $output{'caches'}->{$cache_name}->{'items'}->{$item_key} = \%result;
+        }
+    }
+    else {
+        my %results;
+        my $client = _prepare_client(%params);
+        if($client->is_item_key_alternatives()) {
+            expand_item_keys('pointer_to_params' => \%params, 'client' => $client);
+        }
+        else {
+            $log->warnf('No limiting policy used. Cannot print alternatives.');
+        }
+        if($client->is_cache_name_alternatives()) {
+            expand_cache_names('pointer_to_params' => \%params, 'client' => $client);
+        }
+        else {
+            $log->warnf('No limiting policy used. Cannot print alternatives.');
+        }
+        my %items_and_caches = _prepare_items_and_caches(%params);
+        $log->debugf('list_items(): items_and_caches=%s', \%items_and_caches);
+        my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
+        $parallel_exe->share(\%items_and_caches);
+        $parallel_exe->share(\%results);
+        my @keys = keys %items_and_caches;
+        $log->debugf('list_items(): keys=%s', \@keys);
+        my @rval_results = $parallel_exe->foreach(\@keys, sub {
+            my $details_to_find_item = $items_and_caches{$_};
+            my %result;
+            eval {
+                %result = _get_item_thread('details_to_find_item' => $details_to_find_item, 'pointer_to_params' => \%params);
+            };
+            if($EVAL_ERROR) {
+                print $EVAL_ERROR;
+                return;
             }
             else {
-                $_->rethrow;
+                $results{$_} = \%result;
+                return 1;
             }
+        });
+    
+        $log->debugf('list_items(): All parallel loops processed.');
+        $log->debugf('list_items(): results=%s', \%results);
+        my @sorted_keys = sort { $items_and_caches{$a}->{'order'} <=> $items_and_caches{$b}->{'order'}} keys %items_and_caches;
+        foreach my $sorted_key (@sorted_keys) {
+            my ($cache_name, $item_key) = split '/', $sorted_key;
+            $output{'caches'}->{$cache_name}->{'items'}->{$item_key} = $results{$sorted_key};
         }
-        finally {
-            if($cache) {
-                $output{'caches'}->{$cache_name} = { 'items' => {} };
-                foreach my $item_key (@{$params{'item_key'}}) {
-                    $log->debugf("get_item(): Item: \'%s\'.'.", $item_key);
-                    my $item;
-                    try {
-                        $item = $cache->get('key' => $item_key);
-                    }
-                    catch {
-                        $log->debugf('get_item(): Caught exception:%s', $_);
-                        croak $_ unless blessed $_ && $_->can('rethrow'); ## no critic (ControlStructures::ProhibitPostfixControls)
-                        if ( $_->isa('IronHTTPCallException') ) {
-                            if( $_->status_code == HTTP_NOT_FOUND ) {
-                                $log->debugf('get_item(): Exception: 404 Key not found.');
-                                $log->infof('Key \'%s\' does not exist in cache \'%s\'. Skip item get ...', $item_key, $cache_name);
-                            }
-                            else {
-                                $_->rethrow;
-                            }
-                        }
-                        else {
-                            $_->rethrow;
-                        }
-                    }
-                    finally {
-                        if($item) {
-                            $log->debugf("get_item(): Finished getting item \'%s\' from cache \'%s\'.", $item_key, $cache_name);
-                            $log->debugf("get_item(): Item content: \'%s\'.'.", $item->value());
-                            $output{'caches'}->{$cache_name}->{'items'}->{$item_key} = { 'key' => $item_key, 'value' => $item->value(), 'cas' => $item->cas()};
-                            $output{'caches'}->{$cache_name}->{'items'}->{$item_key}->{'expires'} = $item->expires() if $item->expires();
-                        }
-                        else {
-                            $output{'caches'}->{$cache_name}->{'items'}->{$item_key} = { 'error' => 'Key not exists.' };
-                        }
-                    }; # finally
-                } # foreach key
-            }
-            else {
-                $output{'caches'}->{$cache_name} = { 'error' => 'Cache not exists.' };
-            } # if cache else
-        }; # finally 
-    } # foreach cache
-    $log->tracef('Exiting get_item():%s', \%output);
+    }
+    $log->tracef('Exiting list_items():%s', \%output);
     return %output;
 }
+
+sub expand_cache_names {
+    my %params = validate_with(
+        'params' => \@_, 'spec' => {
+            'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
+            'client' => { type => OBJECT, optional => 0, }, # ref to IronCache client.
+        }, 'allow_extra' => 1,
+    );
+    $log->tracef('Entering expand_cache_names(%s)', \%params);
+    my @alternatives = $params{'client'}->cache_name_alternatives();
+    my @valid_alternatives;
+    foreach my $alternative (@alternatives) {
+        foreach my $candidate (@{$params{'pointer_to_params'}->{'cache_name'}}) {
+            if($alternative =~ /^$candidate$/) {
+                push @valid_alternatives, $alternative;
+            }
+        }
+    }
+    $params{'pointer_to_params'}->{'cache_name'} = \@valid_alternatives;
+    $log->tracef('Exiting expand_cache_names():%s', '[UNDEF]');
+    return;
+}
+
+sub expand_item_keys {
+    my %params = validate_with(
+        'params' => \@_, 'spec' => {
+            'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
+            'client' => { type => OBJECT, optional => 0, }, # ref to IronCache client.
+        }, 'allow_extra' => 1,
+    );
+    $log->tracef('Entering expand_item_keys(%s)', \%params);
+    my @alternatives = $params{'client'}->item_key_alternatives();
+    my @valid_alternatives;
+    foreach my $alternative (@alternatives) {
+        foreach my $candidate (@{$params{'pointer_to_params'}->{'item_key'}}) {
+            if($alternative =~ /$candidate/) {
+                push @valid_alternatives, $alternative;
+            }
+        }
+    }
+    $params{'pointer_to_params'}->{'item_key'} = \@valid_alternatives;
+    $log->tracef('Exiting expand_item_keys():%s', \@valid_alternatives);
+    return @valid_alternatives;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 =head2 show_cache
 
@@ -459,15 +517,15 @@ sub increment_item {
 sub _get_item_thread {
     my %params = validate(
         @_, {
-            'get_item_values' => { type => HASHREF, optional => 0, },
+            'details_to_find_item' => { type => HASHREF, optional => 0, },
             'pointer_to_params' => { type => HASHREF, optional => 0, }, # item key.
         }
     );
     $log->tracef('Entering _get_item_thread(%s)', \%params);
 
     my %result;
-    my $cache_name = $params{'get_item_values'}->{'cache_name'};
-    my $item_key = $params{'get_item_values'}->{'item_key'};
+    my $cache_name = $params{'details_to_find_item'}->{'cache_name'};
+    my $item_key = $params{'details_to_find_item'}->{'item_key'};
     $log->debugf('_get_item_thread():cache_name=%s;item_key=%s;', $cache_name, $item_key);
     my $client = _prepare_client(%{$params{'pointer_to_params'}});
     my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
@@ -475,9 +533,9 @@ sub _get_item_thread {
         my $item = _get_item_safely('cache' => $cache, 'item_key' => $item_key);
         if($item) {
             $log->debugf("_get_item_thread(): Finished getting item \'%s\' from cache \'%s\'.", $item_key, $cache_name);
-            $log->debugf("_get_item_thread(): Item content: \'%s\'.'.", $item->value());
-            $params{'get_item_values'}->{'value'} = $item->value();
             $result{'value'} = $item->value();
+            $result{'cas'} = $item->cas();
+            $result{'expires'} = $item->expires() if $item->expires();
         }
         else {
             $log->warnf('Item \'%s\' does not exist in cache \'%s\'.', $item_key, $cache_name);
@@ -509,13 +567,12 @@ sub get_item {
     );
     $log->tracef('Entering get_item(%s)', \%params);
 
-    # FIXME %output
+    # FIXME %output, We don't use it here!
     my %output;
     my %results;
     my %items_and_caches = _prepare_items_and_caches(%params);
     $log->debugf('get_item(): items_and_caches=%s', \%items_and_caches);
     my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
-    $parallel_exe->share(\%items_and_caches);
     $parallel_exe->share(\%results);
     my @keys = keys %items_and_caches;
     $log->debugf('get_item(): keys=%s', \@keys);
@@ -524,7 +581,7 @@ sub get_item {
         my $value = $items_and_caches{$key};
         my %result;
         eval {
-            %result = _get_item_thread('get_item_values' => $value, 'pointer_to_params' => \%params);
+            %result = _get_item_thread('details_to_find_item' => $value, 'pointer_to_params' => \%params);
         };
         if($EVAL_ERROR) {
             print $EVAL_ERROR;
@@ -597,18 +654,18 @@ sub delete_item {
             'item_key' => { type => ARRAYREF, optional => 0, }, # item key.
         }
     );
-    $log->tracef('Entering _delete_item(%s)', \%params);
+    $log->tracef('Entering delete_item(%s)', \%params);
 
     # FIXME %output
     my %output;
     my %results;
     my %items_and_caches = _prepare_items_and_caches(%params);
-    $log->debugf('_delete_item(): items_and_caches=%s', \%items_and_caches);
+    $log->debugf('delete_item(): items_and_caches=%s', \%items_and_caches);
     my $parallel_exe = Parallel::Loops->new(scalar keys %items_and_caches );
     $parallel_exe->share(\%items_and_caches);
     $parallel_exe->share(\%results);
     my @keys = keys %items_and_caches;
-    $log->debugf('_delete_item(): keys=%s', \@keys);
+    $log->debugf('delete_item(): keys=%s', \@keys);
     my @rval_results = $parallel_exe->foreach(\@keys, sub {
         my $key = $_;
         my $value = $items_and_caches{$key};
@@ -626,15 +683,15 @@ sub delete_item {
         }
     });
 
-    $log->debugf('_delete_item(): All parallel loops processed.');
-    $log->debugf('_delete_item(): results=%s', \%results);
+    $log->debugf('delete_item(): All parallel loops processed.');
+    $log->debugf('delete_item(): results=%s', \%results);
     my @sorted_keys = sort { $items_and_caches{$a}->{'order'} <=> $items_and_caches{$b}->{'order'}} keys %items_and_caches;
     foreach my $sorted_key (@sorted_keys) {
         if(exists $results{$sorted_key}->{'error'}) {
             print $results{$sorted_key}->{'error'} . "\n";
         }
     }
-    $log->tracef('Exiting _delete_item():%s', \%output);
+    $log->tracef('Exiting delete_item():%s', \%output);
     return %output;
 }
 

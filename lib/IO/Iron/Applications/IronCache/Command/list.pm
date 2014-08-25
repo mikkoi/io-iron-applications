@@ -12,6 +12,7 @@ use warnings FATAL => 'all';
 
 # Global creator
 BEGIN {
+    # Inheritance
     use parent qw( IO::Iron::Applications::Command::CommandBase ); # Inheritance
 }
 
@@ -29,60 +30,39 @@ This package is for internal use of IO::Iron packages.
 
 =cut
 
-use Data::Dumper;
+use Log::Any  qw{$log};
 
 use IO::Iron::Applications::IronCache -command;
 
-use Log::Any  qw{$log};
-use Carp::Assert;
-use Carp::Assert::More;
-use Carp;
-use English '-no_match_vars';
-use Try::Tiny;
-use Scalar::Util qw{blessed looks_like_number};
-use Exception::Class (
-      'IronHTTPCallException' => {
-        fields => ['status_code', 'response_message'],
-      }
-  );
-
-require IO::Iron::Applications::IronCache::Functionality;
-require IO::Iron::Applications::IronCache::Templates;
-
 sub description {
-	return "Show an IronCache";
+	return "List caches or items.";
 }
 
 sub usage_desc { 
 	my ($self, $opt, $args) = @_;
-	#print Dumper(@_);
-	#print "This function (usage_desc) is accessed?";
-	return $opt->arg0() . " %o show cache [cache name]" ;
-}
-
-sub usage { 
-    my ($self, $opt, $args) = @_;
-    #print Dumper(@_);
-    #print "This function (usage) is accessed?";
-    #return "Command name list and some more.";
-    return $opt->arg0() . " %o show cache [cache name]" ;
+    return 
+            $opt->arg0() . " %o list caches <cache_name>[,<cache_name>]"
+            . "\n" . 
+            $opt->arg0() . " %o list items <item_key>[,<item_key>] --cache <cache_name>[,<cache_name>]";
 }
 
 sub opt_spec {
     # Note, dashes '-' become underscores '_' during opt_spec conversion!
     return (
         IO::Iron::Applications::Command::CommandBase::opt_spec_base(),
-        [ 'cache=s',    "cache name or names (separated with \',\')", ],
+        [ 'cache=s',    "cache name or names (separated with \',\').", ],
+        [ 'show-value!',    "Show the item value. Default: off.", { 'default' => 0, }, ],
+        [ 'alternatives!',    "Only list possible alternatives, no network access. Default: off.", { 'default' => 0, }, ],
     );
 }
 
 sub validate_args {
 	my ($self, $opt, $args) = @_;
-    #$self->usage_error("too few arguments") unless @$args >= 1;
-    $self->usage_error("wrong arguments") unless ($args->[0] eq 'caches' || $args->[0] eq 'items');
-    $self->usage_error("missing cache name (must have)") if ($args->[0] eq 'items' && !defined $opt->{'cache'});
-    $self->usage_error("missing item name (must have)") if ($args->[0] eq 'items' && !defined $args->[1]);
-    $self->usage_error("Wrong number of arguments") if ($args->[0] eq 'caches' && scalar @{$args} > 1);
+    $self->validate_args_base($opt, $args);
+    $self->usage_error("wrong arguments: use 'list caches' or 'list items'.") unless (defined $args->[0] && ($args->[0] eq 'caches' || $args->[0] eq 'items'));
+    $self->usage_error("missing argument --cache name (must have if 'list items')") if ($args->[0] eq 'items' && !defined $opt->{'cache'});
+    $self->usage_error("Wrong number of arguments") if ($args->[0] eq 'caches' && scalar @{$args} > 2);
+    $self->usage_error("Wrong number of arguments") if ($args->[0] eq 'items' && scalar @{$args} > 2);
 }
 
 sub execute {
@@ -92,13 +72,15 @@ sub execute {
     if($self->check_for_iron_io_config($opts)) {
         return 1;
     }
+    $log->tracef('Entering execute(%s, %s)', $opts, $args);
+
     my %parameters;
     $parameters{'config'} = $opts->{'config'} if defined $opts->{'config'};
     $parameters{'policies'} = $opts->{'policies'} if defined $opts->{'policies'};
     $parameters{'no-policy'} = $opts->{'no-policy'};
+    $parameters{'alternatives'} = $opts->{'alternatives'};
     my %output;
     if($args->[0] eq 'caches') {
-        #$parameters{'cache_name'} = $args->[1] if ($args->[0] eq 'caches' && @$args > 1);
         %output = IO::Iron::Applications::IronCache::Functionality::list_caches(%parameters);
         print $self->combine_template("list_caches", \%output);
     }
@@ -106,7 +88,8 @@ sub execute {
         $parameters{'item_key'} = [ split q{,}, $args->[1] ] if (scalar @{$args} > 1); # expects array
         $parameters{'cache_name'} = [ split q{,}, $opts->{'cache'} ]; # expects array;
         %output = IO::Iron::Applications::IronCache::Functionality::list_items(%parameters);
-        print $self->combine_template("list_items", \%output);
+        my %instructions = ( 'show_value' => $opts->{'show_value'} );
+        print $self->combine_template("list_items", \%output, \%instructions);
     }
     return 0;
 }

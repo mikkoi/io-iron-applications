@@ -27,7 +27,7 @@ sub _list_caches_template {
 }
 
 sub _list_items_template {
-    return "[% USE timestamp = date(format => '%Y-%B-%d') %][% FILTER format('%-30s') %]Cache[% END %][% FILTER format('%-30s') %]Item[% END %][% FILTER format('%-25s') %]expires[% END %]value\n"
+    return "[% USE timestamp = date(format => '%Y-%B-%d') %][% FILTER format('%-30s') %]Cache[% END %][% FILTER format('%-20s') %]Item[% END %][% FILTER format('%-21s') %]expires[% END %][% IF instructions.show_value %]value[% END %]" . $LINEFEED
             . "[% FOREACH cache_name IN data.caches.keys.sort %]"
             . "[% cache = data.caches.item(cache_name) %]"
             . "[% IF cache.error %]"
@@ -36,12 +36,15 @@ sub _list_items_template {
             . "[% FOREACH item_key IN cache.items.keys.sort %]"
             . "[% item = cache.items.item(item_key) %]"
             . "[% IF item.error %]"
-            . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %][% item_key %]:[% item.error %]" . $LINEFEED
+            . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %]"
+            . "[% FILTER format('%-20s') %][% item_key %][% END %]"
+            . "[% FILTER format('%-21s') %] [% END %]"
+            . "[% item.error %]" . $LINEFEED
             . "[% ELSE %]"
             . "[% FILTER format('%-30s') %][% FILTER truncate(29) %][% cache_name %][% END %][% END %]"
-            . "[% FILTER format('%-25s') %][% item_key %][% END %]"
-            . "[% FILTER format('%-25s') %][% item.expires %][% END %]"
-            . "[% item.value %]" . $LINEFEED
+            . "[% FILTER format('%-20s') %][% item_key %][% END %]"
+            . "[% FILTER format('%-21s') %][% item.expires %][% END %]"
+            . "[% IF instructions.show_value %][% item.value %][% END %]" . $LINEFEED
             . "[% END %][%# /IF item.error %]"
             . "[% END %][%# /FOREACH %]"
             . "[% END %][%# /IF cache.error %]"

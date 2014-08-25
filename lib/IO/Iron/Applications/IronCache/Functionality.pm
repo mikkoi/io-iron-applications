@@ -27,11 +27,6 @@ use Try::Tiny;
 use Scalar::Util qw{blessed looks_like_number};
 use Carp::Assert;
 use Carp::Assert::More;
-#use Exception::Class (
-#      'IronHTTPCallException' => {
-#        fields => ['status_code', 'response_message'],
-#      }
-#  );
 use Parallel::Loops;
 
 require IO::Iron::IronCache::Client;
@@ -214,19 +209,6 @@ sub _expand_item_keys {
     return @valid_alternatives;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 =head2 show_cache
 
 show cache function.
@@ -274,6 +256,36 @@ sub show_cache {
     return %output;
 }
 
+=head2 clear_cache
+
+Delete all items in a cache.
+
+=cut
+
+sub clear_cache {
+    my %params = validate(
+        @_, {
+            'config' => { type => SCALAR, optional => 1, }, # config file name.
+            'policies' => { type => SCALAR, optional => 1, }, # policy file name.
+            'no-policy' => { type => BOOLEAN, optional => 1, }, # disable all policy checks.
+            'cache_name' => { type => ARRAYREF, optional => 0, }, # cache names in array
+        }
+    );
+    $log->tracef('Entering clear_cache(%s)', \%params);
+
+    my %cache_params;
+    $cache_params{'config'} = $params{'config'} if defined $params{'config'};
+    $cache_params{'policies'} = $params{'policies'} if defined $params{'policies'};
+    my $client = IO::Iron::IronCache::Client->new(%cache_params);
+    my %output = ( 'project_id' => $client->project_id());
+    foreach my $cache_name (@{$params{'cache_name'}}) {
+        my $cache = $client->get_cache('name' => $cache_name);
+        $cache->clear();
+    }
+    $log->tracef('Exiting clear_cache()');
+    return %output;
+}
+
 =head2 delete_cache
 
 delete cache function.
@@ -286,37 +298,20 @@ sub delete_cache {
             'config' => { type => SCALAR, optional => 1, }, # config file name.
             'policies' => { type => SCALAR, optional => 1, }, # policy file name.
             'no-policy' => { type => BOOLEAN, optional => 1, }, # disable all policy checks.
-            'cache_names' => { type => ARRAYREF, optional => 0, }, # cache name or names separated with ',', no wildcards.
+            'cache_name' => { type => ARRAYREF, optional => 0, }, # cache names in array
         }
     );
-    $log->tracef('Entering _delete_cache(%s)', \%params);
+    $log->tracef('Entering delete_cache(%s)', \%params);
 
     my %cache_params;
     $cache_params{'config'} = $params{'config'} if defined $params{'config'};
     $cache_params{'policies'} = $params{'policies'} if defined $params{'policies'};
     my $client = IO::Iron::IronCache::Client->new(%cache_params);
     my %output = ( 'project_id' => $client->project_id());
-    my @cache_names = split q{,}, $params{'cache_name'};
-    my @cache_infos;
-    foreach my $cache_name (@cache_names) {
-        my $cache_info = $client->get_info_about_cache('name' => $cache_name);
-        $log->debugf("show_cache(): Fetched info about cache:%s", $cache_info);
-        push @cache_infos, $cache_info;
+    foreach my $cache_name (@{$params{'cache_name'}}) {
+        $client->delete_cache('name' => $cache_name);
     }
-    my %infos;
-    foreach my $info (@cache_infos) {
-        my %info;
-        $info{'name'} = $info->{'name'};
-        $info{'id'} = $info->{'id'};
-        $info{'project_id'} = $info->{'project_id'};
-        $info{'size'} = $info->{'size'};
-        $info{'data_size'} = $info->{'data_size'} if defined $info->{'data_size'};
-        $info{'created_at'} = $info->{'created_at'} if defined $info->{'created_at'};
-        $info{'updated_at'} = $info->{'updated_at'} if defined $info->{'updated_at'};
-        $infos{$info->{'name'}} = \%info;
-    }
-    $output{'caches'} = \%infos;
-    $log->tracef('Exiting _delete_cache()');
+    $log->tracef('Exiting _elete_cache()');
     return %output;
 }
 
@@ -355,7 +350,7 @@ sub _put_item_thread {
         }
     }
     else {
-        $log->warnf('Cache \'%s\' does not exist. Skip item get ...', $cache_name);
+        $log->warnf('Cache \'%s\' does not exist. Skip item get. (use option --create-cache to insert to a new cache.) ...', $cache_name);
         $result{'error'} = 'Cache not exists.';
     } # if cache else
     return %result;
@@ -382,7 +377,6 @@ sub put_item {
     );
     $log->tracef('Entering put_item(%s)', \%params);
 
-    # FIXME %output
     my %output;
     my %results;
     my %items_and_caches = _prepare_items_and_caches(%params);
@@ -476,7 +470,6 @@ sub increment_item {
     );
     $log->tracef('Entering increment_item(%s)', \%params);
 
-    # FIXME %output
     my %output;
     my %results;
     my %items_and_caches = _prepare_items_and_caches(%params);
@@ -567,7 +560,6 @@ sub get_item {
     );
     $log->tracef('Entering get_item(%s)', \%params);
 
-    # FIXME %output, We don't use it here!
     my %output;
     my %results;
     my %items_and_caches = _prepare_items_and_caches(%params);
@@ -607,6 +599,10 @@ sub get_item {
     $log->tracef('Exiting get_item():%s', \%output);
     return %output;
 }
+
+#
+# Delete item
+#
 
 sub _delete_item_thread {
     my %params = validate(
@@ -656,7 +652,6 @@ sub delete_item {
     );
     $log->tracef('Entering delete_item(%s)', \%params);
 
-    # FIXME %output
     my %output;
     my %results;
     my %items_and_caches = _prepare_items_and_caches(%params);
@@ -885,120 +880,5 @@ sub _operate_item_safely {
     $log->tracef("'Exiting _operate_item_safely():.'.");
     return;
 }
-
-=pod comment
-
-sub get_item_old {
-    my %params = validate(
-        @_, {
-            'config' => { type => SCALAR, optional => 1, }, # config file name.
-            'policies' => { type => SCALAR, optional => 1, }, # policy file name.
-            'no-policy' => { type => BOOLEAN, optional => 1, }, # disable all policy checks.
-            'cache_name' => { type => ARRAYREF, optional => 0, }, # cache name (or string with wildcards?).
-            'item_key' => { type => ARRAYREF, optional => 0, }, # item key.
-        }
-    );
-    $log->tracef('Entering get_item(%s)', \%params);
-
-    my $client = _prepare_client(%params);
-    my %items_and_caches = _prepare_items_and_caches(%params);
-    my %output = ( 'project_id' => $client->project_id(), 'caches' => {} );
-    foreach my $cache_name (@{$params{'cache_name'}}) {
-        $log->debugf("get_item(): From cache: \'%s\'.'.", $cache_name);
-        my $cache = _get_cache_safely('client' => $client, 'cache_name' => $cache_name);
-        if($cache) {
-            $output{'caches'}->{$cache_name} = { 'items' => {} };
-            foreach my $item_key (@{$params{'item_key'}}) {
-                $log->debugf("get_item(): Item: \'%s\'.'.", $item_key);
-                my $item = _get_item_safely('cache' => $cache, 'item_key' => $item_key);
-                if($item) {
-                    $log->debugf("get_item(): Finished getting item \'%s\' from cache \'%s\'.", $item_key, $cache_name);
-                    $log->debugf("get_item(): Item content: \'%s\'.'.", $item->value());
-                    $output{'caches'}->{$cache_name}->{'items'}->{$item_key} = { 'key' => $item_key, 'value' => $item->value(), 'cas' => $item->cas()};
-                    $output{'caches'}->{$cache_name}->{'items'}->{$item_key}->{'expires'} = $item->expires() if $item->expires();
-                }
-                else {
-                    $output{'caches'}->{$cache_name}->{'items'}->{$item_key} = { 'error' => 'Key not exists.' };
-                }
-            } # foreach item key
-        }
-        else {
-            $log->warnf('Cache \'%s\' does not exist. Skip item get ...', $cache_name);
-            $output{'caches'}->{$cache_name} = { 'error' => 'Cache not exists.' };
-        } # if cache else
-    } # foreach cache name
-    $log->tracef('Exiting get_item():%s', \%output);
-    return %output;
-}
-
-sub put_item_old {
-    my %params = validate(
-        @_, {
-            'config' => { type => SCALAR, optional => 1, }, # config file name.
-            'policies' => { type => SCALAR, optional => 1, }, # policy file name.
-            'no-policy' => { type => BOOLEAN, optional => 1, }, # disable all policy checks.
-            'cache_name' => { type => ARRAYREF, optional => 0, }, # cache name (or string with wildcards?).
-            'item_key' => { type => ARRAYREF, optional => 0, }, # item key.
-            'item_value' => { type => SCALAR, optional => 0, }, # item value.
-            'create_cache' => { type => BOOLEAN, optional => 1, }, # create cache if cache does not exist.
-            'expires_in' => { type => SCALAR, optional => 1, }, # item expires in ? seconds.
-        }
-    );
-    $log->tracef('Entering put_item(%s)', \%params);
-
-    my %cache_params;
-    $cache_params{'config'} = $params{'config'} if defined $params{'config'};
-    $cache_params{'policies'} = $params{'policies'} if defined $params{'policies'};
-    my $client = IO::Iron::IronCache::Client->new(%cache_params);
-    my %output = ( 'project_id' => $client->project_id());
-    foreach my $cache_name (@{$params{'cache_name'}}) {
-        $log->debugf("put_item(): To cache: \'%s\'.'.", $cache_name);
-        my $cache;
-        my $write_item = 1;
-        try {
-            $cache = $client->get_cache('name' => $cache_name);
-        }
-        catch {
-            $log->debugf('put_item(): Caught exception:%s', $_);
-            croak $_ unless blessed $_ && $_->can('rethrow'); ## no critic (ControlStructures::ProhibitPostfixControls)
-            if ( $_->isa('IronHTTPCallException') ) {
-                if( $_->status_code == HTTP_NOT_FOUND ) {
-                    $log->debugf('put_item(): Exception: 404 Cache not found.');
-                    if ($params{'create_cache'}) {
-                        $log->infof('Cache \'%s\' does not exist. Creating new cache.', $cache_name);
-                        $cache = $client->create_cache('name' => $cache_name);
-                    }
-                    else {
-                        $log->warnf('Cache \'%s\' does not exist. Skip item input ...', $cache_name);
-                        $write_item = 0;
-                    }
-                }
-                else {
-                    $_->rethrow;
-                }
-            }
-            else {
-                $_->rethrow;
-            }
-        };
-        if($write_item) {
-            foreach my $item_key (@{$params{'item_key'}}) {
-                $log->debugf("put_item(): To item: \'%s\'.'.", $item_key);
-                my %item_parameters;
-                $item_parameters{'value'} = $params{'item_value'};
-                $item_parameters{'expires_in'} = $params{'expires_in'} if $params{'expires_in'};
-                my $item = IO::Iron::IronCache::Item->new(%item_parameters);
-                #$item->expires_in($params{'expires_in'}) if $params{'expires_in'};
-                $cache->put('key' => $item_key, 'item' => $item);
-                $log->debugf("put_item(): Finished putting item \'%s\' into cache \'%s\'.", $item_key, $cache_name);
-                $log->debugf("put_item(): Item content: \'%s\'.'.", $item->value());
-            }
-        }
-    }
-    $log->tracef('Exiting put_item():%s', \%output);
-    return %output;
-}
-
-=cut
 
 1;

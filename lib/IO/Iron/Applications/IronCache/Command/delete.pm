@@ -41,16 +41,18 @@ sub opt_spec {
 	return (
         IO::Iron::Applications::Command::CommandBase::opt_spec_base(),
 		[ 'cache=s',	"cache name or names (separated with \',\')", ],
-		# TODO opt --quiet ???
 	);
 }
 
 sub validate_args {
 	my ($self, $opt, $args) = @_;
     $self->validate_args_base($opt, $args);
-	$self->usage_error("wrong number of arguments") unless scalar @{$args} == 2;
-	$self->usage_error("invalid arguments") unless ($args->[0] eq 'item');
-    $self->usage_error("missing cache name") unless (defined $opt->{'cache'});
+#	$self->usage_error("wrong number of arguments") if($args->[0] eq 'item' && scalar @{$args} != 2 && !defined $opt->{'cache'});
+#    $self->usage_error("wrong number of arguments") if($args->[0] eq 'cache' && scalar @{$args} != 2);
+	$self->usage_error("invalid arguments")
+	       if(($args->[0] eq 'item'  && !defined $opt->{'cache'})
+	       || ($args->[0] eq 'cache' && defined $opt->{'cache'}));
+#    $self->usage_error("missing cache name") unless (defined $opt->{'cache'});
 }
 
 sub execute {
@@ -64,12 +66,19 @@ sub execute {
     $parameters{'config'} = $opts->{'config'} if defined $opts->{'config'};
     $parameters{'policies'} = $opts->{'policies'} if defined $opts->{'policies'};
     $parameters{'no-policy'} = $opts->{'no-policy'};
-    $parameters{'item_key'} = [ split q{,}, $args->[1] ]; # expects array
-    $parameters{'cache_name'} = [ split q{,}, $opts->{'cache'} ]; # expects array
-    my %output;
-    %output = IO::Iron::Applications::IronCache::Functionality::delete_item(%parameters);
-
-    print $self->combine_template("delete_item", \%output);
+    if($args->[0] eq 'cache') {
+        my %output;
+        $parameters{'cache_name'} = [ split q{,}, $args->[1] ]; # expects array
+        %output = IO::Iron::Applications::IronCache::Functionality::delete_cache(%parameters);
+        print $self->combine_template("delete_cache", \%output);
+    }
+    elsif($args->[0] eq 'item') {
+        my %output;
+        $parameters{'item_key'} = [ split q{,}, $args->[1] ]; # expects array
+        $parameters{'cache_name'} = [ split q{,}, $opts->{'cache'} ]; # expects array
+        %output = IO::Iron::Applications::IronCache::Functionality::delete_item(%parameters);
+        print $self->combine_template("delete_item", \%output);
+    }    
     return 0;
 }
 

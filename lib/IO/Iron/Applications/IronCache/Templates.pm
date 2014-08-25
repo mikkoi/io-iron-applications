@@ -75,28 +75,20 @@ sub _increment_item_template {
     return '';
 }
 
+sub _delete_cache_template {
+    return '';
+}
+
 sub _delete_item_template {
+    return '';
+}
+
+sub _clear_cache_template {
     return '';
 }
 
 sub _get_item_template {
     return ""
-# printing is done from inside the executing function!
-#            . "[% FOREACH cache_name IN data.caches.keys.sort %]"
-#            . "[% cache = data.caches.item(cache_name) %]"
-#            . "[% IF cache.error %]"
-#            . "[% cache_name %]:[% cache.error %]" . $LINEFEED
-#            . "[% ELSE %]"
-#            . "[% FOREACH item_key IN cache.items.keys.sort %]"
-#            . "[% item = cache.items.item(item_key) %]"
-#            . "[% IF item.error %]"
-#            . "[% item_key %]:[% item.error %]"
-#            . "[% ELSE %]"
-#            . "[% item.value %]"
-#            . "[% END %][%# /IF item.error %]" . $LINEFEED # Attn. The linefeed is here!
-#            . "[% END %][%# /FOREACH %]"
-#            . "[% END %][%# /IF cache.error %]"
-#            . "[% END %][%# /FOREACH %]"
             ;
 }
 

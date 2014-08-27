@@ -38,7 +38,7 @@ sub description {
 	return "List caches or items.";
 }
 
-sub usage_desc { 
+sub usage_desc {
 	my ($self, $opt, $args) = @_;
     return 
             $opt->arg0() . " %o list caches <cache_name>[,<cache_name>]"

@@ -32,7 +32,7 @@ sub description {
 	return "Get item(s) from cache(s).";
 }
 
-sub usage_desc { 
+sub usage_desc {
 	my ($self, $opt, $args) = @_;
 	return $opt->arg0() . " %o put item <item_key>[,<item_key>] --cache <cache_name>[,<cache_name>]";
 }

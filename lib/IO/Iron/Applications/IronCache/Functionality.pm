@@ -152,7 +152,7 @@ sub list_items {
                 return 1;
             }
         });
-    
+ 
         $log->debugf('list_items(): All parallel loops processed.');
         $log->debugf('list_items(): results=%s', \%results);
         my @sorted_keys = sort { $items_and_caches{$a}->{'order'} <=> $items_and_caches{$b}->{'order'}} keys %items_and_caches;

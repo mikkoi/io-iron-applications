@@ -32,7 +32,7 @@ sub description {
 	return "Increment integer item(s) in cache(s).";
 }
 
-sub usage_desc { 
+sub usage_desc {
 	my ($self, $opt, $args) = @_;
 	return $opt->arg0() . " %o increment item <item_key>[,<item_key>] --value <increment_value> --cache <cache_name>[,<cache_name>]";
 }

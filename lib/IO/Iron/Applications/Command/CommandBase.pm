@@ -69,7 +69,7 @@ the client objects are created.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 description 
+=head2 description
 
 Describe the command.
 

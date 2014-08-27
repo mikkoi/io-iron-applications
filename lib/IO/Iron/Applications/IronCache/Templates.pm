@@ -21,7 +21,7 @@ my $LINEFEED = qq{\n};
 
 sub _list_caches_template {
     return '[% FOREACH cache_name IN data.caches.keys.sort %]'
-            . '[% cache_name %]' . $LINEFEED 
+            . '[% cache_name %]' . $LINEFEED
             . '[% END %]'
             ;
 }
@@ -65,7 +65,7 @@ sub _show_cache_template {
 }
 
 # Attn. These four functions which operate "simple" operations on items
-# do not have anything to pring, except get_item 
+# do not have anything to print, except get_item
 # which only outputs the item's (or items') content.
 sub _put_item_template {
     return '';

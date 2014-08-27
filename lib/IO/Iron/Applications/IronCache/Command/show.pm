@@ -52,7 +52,7 @@ sub description {
 	return "Show information about cache(s).";
 }
 
-sub usage_desc { 
+sub usage_desc {
 	my ($self, $opt, $args) = @_;
 	return $opt->arg0() . " %o show cache cache_name[,cache_name][,name_with_wildcards]";
 }

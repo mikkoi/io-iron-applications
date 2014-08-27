@@ -1,0 +1,25 @@
+# The manifest skip file.
+# Add here all the files that must not be included in the distribution.
+# Regexp and empty lines okay.
+
+# This file
+MANIFEST.SKIP
+
+# Eclipse project stuff
+.includepath
+.settings
+.project
+
+# No iron config files
+iron_.*.json
+
+# Release builder configs
+dist.ini
+weaver.ini
+
+# Remove some testing stuff
+.proverc
+podpreview.pl
+
+# No git vcs stuff
+.git

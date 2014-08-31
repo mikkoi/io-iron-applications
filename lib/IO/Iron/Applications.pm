@@ -24,7 +24,7 @@ shell and not using a web browser.
 =head2 Policies
 
 The programs take use of the IO::Iron package feature 
-L<policies|IO::Iron/"Policies"> so wildcards can be used in
+L<policies|IO::Iron/"Policies"> so wildcard characters can be used in
 cache names, item keys, etc.
 
 For example, if F<iron_cache_policies.json>:

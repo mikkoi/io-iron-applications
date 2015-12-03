@@ -40,9 +40,9 @@ sub description {
 
 sub usage_desc {
 	my ($self, $opt, $args) = @_;
-    return 
+    return
             $opt->arg0() . " %o list caches <cache_name>[,<cache_name>]"
-            . "\n" . 
+            . "\n" .
             $opt->arg0() . " %o list items <item_key>[,<item_key>] --cache <cache_name>[,<cache_name>]";
 }
 
@@ -85,7 +85,11 @@ sub execute {
         print $self->combine_template("list_caches", \%output);
     }
     elsif($args->[0] eq 'items') {
-        $parameters{'item_key'} = [ split q{,}, $args->[1] ] if (scalar @{$args} > 1); # expects array
+        if (scalar @{$args} > 1) {
+            $parameters{'item_key'} = [ split q{,}, $args->[1] ]; # expects array
+        } else {
+            $parameters{'item_key'} = [ ".*" ]; # expects array
+        }
         $parameters{'cache_name'} = [ split q{,}, $opts->{'cache'} ]; # expects array;
         %output = IO::Iron::Applications::IronCache::Functionality::list_items(%parameters);
         my %instructions = ( 'show_value' => $opts->{'show_value'} );
